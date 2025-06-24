@@ -1,6 +1,9 @@
+# ================================
+# 📦 PACKAGE INSTALL & IMPORTS
+# ================================
 import streamlit as st
 import os
-import fitz
+import fitz  # PyMuPDF
 import pandas as pd
 import zipfile
 import tempfile
@@ -9,12 +12,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
-# Configuration
+# ================================
+# ⚙️ CONFIGURATION
+# ================================
 st.set_page_config(page_title="MR.Strict", layout="centered")
 SENDER_EMAIL = "godwinscollabproject1@gmail.com"
 SENDER_PASS = "mvyvmhawgrgbqivb"
 
-# Email sender class
+# ================================
+# 📧 EMAIL SENDER CLASS
+# ================================
 class EmailSender:
     def __init__(self, sender_email, sender_password):
         self.sender_email = sender_email
@@ -40,7 +47,9 @@ class EmailSender:
         server.quit()
         return f"📧 Email sent successfully to: {to_email}"
 
-# PDF text extractor
+# ================================
+# 📄 PDF TEXT EXTRACTION FUNCTION
+# ================================
 def extract_text(pdf_path_or_file):
     try:
         if isinstance(pdf_path_or_file, str):
@@ -54,7 +63,9 @@ def extract_text(pdf_path_or_file):
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-# Evaluator
+# ================================
+# 🎯 EVALUATION FUNCTION
+# ================================
 def evaluate_and_score(original, student):
     orig_lines = set(line.strip().lower() for line in original.strip().splitlines() if line.strip())
     stud_lines = set(line.strip().lower() for line in student.strip().splitlines() if line.strip())
@@ -94,7 +105,9 @@ def evaluate_and_score(original, student):
 
     return marks, final_score
 
-# UI
+# ================================
+# 🖥️ STREAMLIT UI
+# ================================
 st.title("🧠 MR.Strict - Auto PDF Evaluator + Email Marks")
 st.markdown("This tool compares student answers with the original answer and emails the marks as a CSV.")
 
@@ -102,67 +115,69 @@ st.markdown("This tool compares student answers with the original answer and ema
 st.markdown("### 📌 Step 1: Upload the Original Answer PDF")
 original_pdf = st.file_uploader("Upload original answer file", type=["pdf"])
 
-# Show extracted text
-if original_pdf:
-    original_text = extract_text(original_pdf)
-    st.text_area("📖 Extracted Original Answer Text", value=original_text, height=200)
-
 # Step 2
-st.markdown("### 📂 Step 2: Upload Student PDFs as a ZIP File")
-student_zip = st.file_uploader("Upload student answers (ZIP)", type=["zip"])
+st.markdown("### 📂 Step 2: Upload a ZIP Folder of Student PDFs")
+student_zip = st.file_uploader("Upload zipped student folder (Max 160 PDFs)", type=["zip"])
 
 # Step 3
 st.markdown("### 📧 Step 3: Enter Teacher's Email")
 receiver_email = st.text_input("Teacher Email")
 
 # Step 4
-st.markdown("### 🧮 Step 4: Evaluate and Email Results")
-if st.button("📤 Evaluate & Send Email"):
+st.markdown("### 📤 Step 4: Evaluate and Send Results")
+if st.button("🧮 Evaluate & Send Email"):
     if not original_pdf or not student_zip or not receiver_email:
         st.error("❗ Please complete all steps.")
     else:
         try:
-            st.info("🔍 Extracting and processing student files...")
-            with tempfile.TemporaryDirectory() as tmpdir:
-                zip_path = os.path.join(tmpdir, "students.zip")
-                with open(zip_path, "wb") as f:
-                    f.write(student_zip.read())
-                with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                    zip_ref.extractall(tmpdir)
+            original_text = extract_text(original_pdf)
+            if original_text.startswith("❌") or original_text.startswith("⚠️"):
+                st.error("❌ Error in original answer PDF.")
+            else:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    zip_path = os.path.join(tmpdir, "students.zip")
+                    with open(zip_path, "wb") as f:
+                        f.write(student_zip.read())
+                    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                        zip_ref.extractall(tmpdir)
 
-                pdf_files = [f for f in os.listdir(tmpdir) if f.endswith(".pdf")]
+                    all_pdfs = [f for f in os.listdir(tmpdir) if f.endswith(".pdf")]
+                    total = len(all_pdfs)
 
-                if not pdf_files:
-                    st.warning("⚠️ No valid PDF files found in the ZIP.")
-                else:
-                    st.success(f"✅ {len(pdf_files)} student PDFs found:")
-                    st.write(pdf_files)
+                    if total == 0:
+                        st.warning("⚠️ No PDF files found inside the ZIP.")
+                    elif total > 160:
+                        st.warning(f"⚠️ Too many PDFs! Limit is 160. Found: {total}")
+                    else:
+                        st.success(f"✅ Found {total} student PDFs.")
+                        st.text("📁 File List:")
+                        st.write(all_pdfs)
 
-                    results = []
-                    for file in pdf_files:
-                        path = os.path.join(tmpdir, file)
-                        student_text = extract_text(path)
-                        if student_text.startswith("❌") or student_text.startswith("⚠️"):
-                            continue
-                        marks, final_score = evaluate_and_score(original_text, student_text)
-                        results.append({
-                            "Student File": file,
-                            "Marks": marks,
-                            "Score %": f"{final_score:.2f}%"
-                        })
+                        results = []
+                        for file in all_pdfs:
+                            path = os.path.join(tmpdir, file)
+                            student_text = extract_text(path)
+                            if student_text.startswith("❌") or student_text.startswith("⚠️"):
+                                continue
+                            marks, final_score = evaluate_and_score(original_text, student_text)
+                            results.append({
+                                "Student File": file,
+                                "Marks": marks,
+                                "Score %": f"{final_score:.2f}%"
+                            })
 
-                    df = pd.DataFrame(results)
-                    csv_path = os.path.join(tmpdir, "assignment_marks.csv")
-                    df.to_csv(csv_path, index=False)
+                        df = pd.DataFrame(results)
+                        csv_path = os.path.join(tmpdir, "assignment_marks.csv")
+                        df.to_csv(csv_path, index=False)
 
-                    mailer = EmailSender(SENDER_EMAIL, SENDER_PASS)
-                    status = mailer.send_email(
-                        to_email=receiver_email,
-                        subject="📊 Assignment Marks - MR.Strict",
-                        body="Hi Teacher,\n\nPlease find attached the evaluated assignment marks.\n\nRegards,\nMR.Strict 🤖",
-                        attachment_path=csv_path
-                    )
-                    st.success("✅ Evaluation complete and email sent.")
-                    st.success(status)
+                        mailer = EmailSender(SENDER_EMAIL, SENDER_PASS)
+                        status = mailer.send_email(
+                            to_email=receiver_email,
+                            subject="📊 Assignment Marks - MR.Strict",
+                            body="Hi Teacher,\n\nPlease find attached the evaluated assignment marks.\n\nRegards,\nMR.Strict 🤖",
+                            attachment_path=csv_path
+                        )
+                        st.success("✅ Evaluation complete and email sent.")
+                        st.success(status)
         except Exception as e:
-            st.error(f"❌ Error: {e}")
+            st.error(f"❌ Unexpected error: {e}")
