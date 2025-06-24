@@ -111,24 +111,24 @@ def evaluate_and_score(original, student):
 st.title("🧠 MR.Strict - Auto PDF Evaluator + Email Marks")
 st.markdown("This tool compares student answers with the original answer and emails the marks as a CSV.")
 
-# Step 1 - Upload original answer PDF
+# 📌 Step 1 - Upload original answer PDF
 st.subheader("📌 Step 1: Upload Original Answer PDF")
 original_pdf = st.file_uploader("Upload Original Answer", type=["pdf"])
 
-# Text display for original
+# 🧾 Extract and display text
 if original_pdf:
     extracted_text = extract_text(original_pdf)
     st.text_area("📖 Extracted Text from Original Answer", value=extracted_text, height=200)
 
-# Step 2 - Upload ZIP of student PDFs
+# 📂 Step 2 - Upload ZIP of student PDFs
 st.subheader("📂 Step 2: Upload Student PDFs ZIP")
 student_zip = st.file_uploader("Upload ZIP File", type=["zip"])
 
-# Step 3 - Teacher's email
+# 📧 Step 3 - Teacher's email
 st.subheader("📧 Step 3: Enter Teacher's Email")
 receiver_email = st.text_input("Teacher Email")
 
-# Evaluate button
+# 📤 Step 4 - Evaluate
 st.subheader("📤 Step 4: Click Below to Evaluate and Email")
 if st.button("🧮 Evaluate & Send Email"):
     if not original_pdf or not student_zip or not receiver_email:
@@ -147,22 +147,29 @@ if st.button("🧮 Evaluate & Send Email"):
                     with zipfile.ZipFile(zip_path, "r") as zip_ref:
                         zip_ref.extractall(tmpdir)
 
+                    all_files = os.listdir(tmpdir)
+                    pdf_files = [file for file in all_files if file.endswith(".pdf")]
+
+                    # 📃 Display file names and count
+                    st.markdown("### 📄 Student Files Detected:")
+                    st.write(pdf_files)
+                    st.info(f"📁 Total student PDFs found: **{len(pdf_files)}**")
+
                     results = []
-                    for file in os.listdir(tmpdir):
-                        if file.endswith(".pdf"):
-                            filepath = os.path.join(tmpdir, file)
-                            student_text = extract_text(filepath)
-                            if student_text.startswith("❌") or student_text.startswith("⚠️"):
-                                continue
-                            marks, final_score = evaluate_and_score(original_text, student_text)
-                            results.append({
-                                "Student File": file,
-                                "Marks": marks,
-                                "Score %": f"{final_score:.2f}%"
-                            })
+                    for file in pdf_files:
+                        filepath = os.path.join(tmpdir, file)
+                        student_text = extract_text(filepath)
+                        if student_text.startswith("❌") or student_text.startswith("⚠️"):
+                            continue
+                        marks, final_score = evaluate_and_score(original_text, student_text)
+                        results.append({
+                            "Student File": file,
+                            "Marks": marks,
+                            "Score %": f"{final_score:.2f}%"
+                        })
 
                     if not results:
-                        st.warning("⚠️ No valid student PDFs found.")
+                        st.warning("⚠️ No valid student PDFs evaluated.")
                     else:
                         df = pd.DataFrame(results)
                         csv_path = os.path.join(tmpdir, "assignment_marks.csv")
