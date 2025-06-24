@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/13b-_2a7XGTveEEPUPzjs5WOCZZAObxCu
 """
 
-!pip install streamlit pymupdf pandas
+pip install streamlit pymupdf pandas
 
 # ================================
 # 📦 PACKAGE INSTALL & IMPORTS
